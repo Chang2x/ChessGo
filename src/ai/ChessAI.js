@@ -1,155 +1,144 @@
 class ChessAI {
     constructor(difficulty = 'medium') {
         this.difficulty = difficulty;
-        this.pieceValues = {
-            p: 100,   // pawn
-            n: 320,   // knight
-            b: 330,   // bishop
-            r: 500,   // rook
-            q: 900,   // queen
-            k: 20000  // king
-        };
-
-        this.pawnPositionBonus = [
-            [0,  0,  0,  0,  0,  0,  0,  0],
-            [50, 50, 50, 50, 50, 50, 50, 50],
-            [10, 10, 20, 30, 30, 20, 10, 10],
-            [5,  5, 10, 25, 25, 10,  5,  5],
-            [0,  0,  0, 20, 20,  0,  0,  0],
-            [5, -5,-10,  0,  0,-10, -5,  5],
-            [5, 10, 10,-20,-20, 10, 10,  5],
-            [0,  0,  0,  0,  0,  0,  0,  0]
-        ];
-
-        this.knightPositionBonus = [
-            [-50,-40,-30,-30,-30,-30,-40,-50],
-            [-40,-20,  0,  0,  0,  0,-20,-40],
-            [-30,  0, 10, 15, 15, 10,  0,-30],
-            [-30,  5, 15, 20, 20, 15,  5,-30],
-            [-30,  0, 15, 20, 20, 15,  0,-30],
-            [-30,  5, 10, 15, 15, 10,  5,-30],
-            [-40,-20,  0,  5,  5,  0,-20,-40],
-            [-50,-40,-30,-30,-30,-30,-40,-50]
-        ];
-
-        this.difficultySettings = {
-            easy: { depth: 2, randomness: 0.3 },
-            medium: { depth: 3, randomness: 0.15 },
-            hard: { depth: 4, randomness: 0 }
+        this.depthMap = {
+            'easy': 2,
+            'medium': 3,
+            'hard': 4
         };
     }
 
-    evaluateBoard(position) {
-        let score = 0;
-        const gamePhase = position.isGameOver() ? 'endgame' : 
-                         position.moveNumber < 10 ? 'opening' : 
-                         'middlegame';
-
-        // Calculate material and positional advantage
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                const square = String.fromCharCode(97 + j) + (8 - i);
-                const piece = position.get(square);
-                
-                if (piece) {
-                    // Base piece value
-                    const baseValue = this.pieceValues[piece.type.toLowerCase()];
-                    let positionBonus = 0;
-
-                    // Add positional bonus based on piece type
-                    if (piece.type.toLowerCase() === 'p') {
-                        positionBonus = piece.color === 'w' ? 
-                            this.pawnPositionBonus[i][j] : 
-                            this.pawnPositionBonus[7-i][j];
-                    } else if (piece.type.toLowerCase() === 'n') {
-                        positionBonus = piece.color === 'w' ? 
-                            this.knightPositionBonus[i][j] : 
-                            this.knightPositionBonus[7-i][j];
-                    }
-
-                    // Adjust bonus based on game phase
-                    if (gamePhase === 'opening') {
-                        if (piece.type.toLowerCase() === 'n' || piece.type.toLowerCase() === 'b') {
-                            positionBonus *= 1.5;
-                        }
-                    }
-
-                    score += piece.color === 'w' ? 
-                        (baseValue + positionBonus) : 
-                        -(baseValue + positionBonus);
-                }
-            }
-        }
-
-        // Additional strategic evaluations
-        if (position.isCheck()) {
-            score += position.turn() === 'w' ? -50 : 50;
-        }
-
-        if (position.isCheckmate()) {
-            score += position.turn() === 'w' ? -10000 : 10000;
-        }
-
-        return score;
-    }
-
-    minimax(position, depth, alpha, beta, isMaximizing) {
-        if (depth === 0) return this.evaluateBoard(position);
-
-        const moves = position.moves({ verbose: true });
-        moves.sort(() => Math.random() - 0.5);
-
-        if (isMaximizing) {
-            let maxEval = -Infinity;
-            for (const move of moves) {
-                position.move(move);
-                const evaluation = this.minimax(position, depth - 1, alpha, beta, false);
-                position.undo();
-                maxEval = Math.max(maxEval, evaluation);
-                alpha = Math.max(alpha, evaluation);
-                if (beta <= alpha) break;
-            }
-            return maxEval;
-        } else {
-            let minEval = Infinity;
-            for (const move of moves) {
-                position.move(move);
-                const evaluation = this.minimax(position, depth - 1, alpha, beta, true);
-                position.undo();
-                minEval = Math.min(minEval, evaluation);
-                beta = Math.min(beta, evaluation);
-                if (beta <= alpha) break;
-            }
-            return minEval;
-        }
-    }
-
-    getBestMove(game) {
-        const { depth, randomness } = this.difficultySettings[this.difficulty];
+    async getBestMove(game) {
+        const depth = this.depthMap[this.difficulty] || 3;
         const moves = game.moves({ verbose: true });
         
         if (moves.length === 0) return null;
 
-        // For easy difficulty, occasionally make a random move
-        if (Math.random() < randomness) {
-            return moves[Math.floor(Math.random() * moves.length)];
-        }
-
         let bestMove = null;
-        let bestValue = -Infinity;
+        let bestScore = -Infinity;
 
         for (const move of moves) {
             game.move(move);
-            const value = -this.minimax(game, depth - 1, -Infinity, Infinity, false);
+            const score = -this.minimax(game, depth - 1, -Infinity, Infinity, false);
             game.undo();
 
-            if (value > bestValue) {
-                bestValue = value;
+            if (score > bestScore) {
+                bestScore = score;
                 bestMove = move;
             }
         }
 
         return bestMove;
+    }
+
+    minimax(game, depth, alpha, beta, isMaximizing) {
+        if (depth === 0) return this.evaluatePosition(game);
+
+        const moves = game.moves();
+        if (moves.length === 0) {
+            if (game.isCheckmate()) return isMaximizing ? -10000 : 10000;
+            return 0; // Stalemate
+        }
+
+        if (isMaximizing) {
+            let maxScore = -Infinity;
+            for (const move of moves) {
+                game.move(move);
+                const score = this.minimax(game, depth - 1, alpha, beta, false);
+                game.undo();
+                maxScore = Math.max(maxScore, score);
+                alpha = Math.max(alpha, score);
+                if (beta <= alpha) break;
+            }
+            return maxScore;
+        } else {
+            let minScore = Infinity;
+            for (const move of moves) {
+                game.move(move);
+                const score = this.minimax(game, depth - 1, alpha, beta, true);
+                game.undo();
+                minScore = Math.min(minScore, score);
+                beta = Math.min(beta, score);
+                if (beta <= alpha) break;
+            }
+            return minScore;
+        }
+    }
+
+    evaluatePosition(game) {
+        const pieceValues = {
+            'p': 1,
+            'n': 3,
+            'b': 3,
+            'r': 5,
+            'q': 9,
+            'k': 0
+        };
+
+        // Position weights for different pieces
+        const pawnPositionWeights = [
+            [0, 0, 0, 0, 0, 0, 0, 0],
+            [5, 5, 5, 5, 5, 5, 5, 5],
+            [1, 1, 2, 3, 3, 2, 1, 1],
+            [0.5, 0.5, 1, 2.5, 2.5, 1, 0.5, 0.5],
+            [0, 0, 0, 2, 2, 0, 0, 0],
+            [0.5, -0.5, -1, 0, 0, -1, -0.5, 0.5],
+            [0.5, 1, 1, -2, -2, 1, 1, 0.5],
+            [0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+
+        const knightPositionWeights = [
+            [-5, -4, -3, -3, -3, -3, -4, -5],
+            [-4, -2, 0, 0, 0, 0, -2, -4],
+            [-3, 0, 1, 1.5, 1.5, 1, 0, -3],
+            [-3, 0.5, 1.5, 2, 2, 1.5, 0.5, -3],
+            [-3, 0, 1.5, 2, 2, 1.5, 0, -3],
+            [-3, 0.5, 1, 1.5, 1.5, 1, 0.5, -3],
+            [-4, -2, 0, 0.5, 0.5, 0, -2, -4],
+            [-5, -4, -3, -3, -3, -3, -4, -5]
+        ];
+
+        let score = 0;
+        const board = game.board();
+
+        // Material and position evaluation
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                const piece = board[i][j];
+                if (!piece) continue;
+
+                const baseValue = pieceValues[piece.type.toLowerCase()] || 0;
+                let positionValue = 0;
+
+                // Add position-based values
+                if (piece.type.toLowerCase() === 'p') {
+                    positionValue = pawnPositionWeights[piece.color === 'w' ? i : 7 - i][j];
+                } else if (piece.type.toLowerCase() === 'n') {
+                    positionValue = knightPositionWeights[piece.color === 'w' ? i : 7 - i][j];
+                }
+
+                const totalValue = baseValue + positionValue;
+                score += piece.color === 'w' ? totalValue : -totalValue;
+            }
+        }
+
+        // Mobility evaluation
+        const mobility = game.moves().length;
+        score += (game.turn() === 'w' ? 0.1 : -0.1) * mobility;
+
+        // Check and checkmate evaluation
+        if (game.isCheck()) {
+            score += game.turn() === 'w' ? -0.5 : 0.5;
+        }
+        if (game.isCheckmate()) {
+            score += game.turn() === 'w' ? -100 : 100;
+        }
+
+        // Castling evaluation
+        const castlingRights = game.history().filter(move => move.includes('O-O')).length;
+        score += (game.turn() === 'w' ? 0.3 : -0.3) * castlingRights;
+
+        return score;
     }
 }
 

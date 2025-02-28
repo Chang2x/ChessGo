@@ -1,16 +1,23 @@
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Colors */
+  --primary-bg: #242424;
+  --primary-text: rgba(255, 255, 255, 0.87);
+  --secondary-bg: rgba(255, 255, 255, 0.1);
+  
+  /* Typography */
+  --base-font: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --base-size: clamp(14px, 2vw, 16px);
+  --heading-size: clamp(18px, 3vw, 24px);
+  
+  /* Spacing */
+  --spacing-xs: clamp(4px, 1vw, 8px);
+  --spacing-sm: clamp(8px, 2vw, 12px);
+  --spacing-md: clamp(12px, 3vw, 20px);
+  --spacing-lg: clamp(20px, 4vw, 32px);
+  
+  /* Layout */
+  --container-width: min(95vw, 800px);
+  --border-radius: clamp(4px, 1vw, 8px);
 }
 
 * {
@@ -22,7 +29,64 @@
 html, body {
   width: 100%;
   height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
+  font-family: var(--base-font);
+  font-size: var(--base-size);
+  line-height: 1.5;
+  color: var(--primary-text);
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: clamp(4px, 1.5vw, 8px);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--secondary-bg);
+  border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: var(--border-radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) var(--secondary-bg);
+}
+
+/* Mobile-first container */
+.container {
+  width: 100%;
+  max-width: var(--container-width);
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+/* Responsive headings */
+h1 { font-size: clamp(24px, 5vw, 32px); }
+h2 { font-size: clamp(20px, 4vw, 28px); }
+h3 { font-size: clamp(18px, 3.5vw, 24px); }
+
+/* Responsive buttons */
+button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--base-size);
+  border-radius: var(--border-radius);
+  border: none;
+  background: var(--secondary-bg);
+  color: var(--primary-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

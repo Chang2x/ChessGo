@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Chess } from 'chess.js';
+import ChessBoard from './ChessBoard';
 import ChessAI from '../ai/ChessAI';
 import './GameBoard.css';
 
-const GameBoard = ({ difficulty = 'medium', onBack }) => {
+const GameBoard = ({ difficulty = 'medium', playerColor = 'w', onBack }) => {
     const [game, setGame] = useState(() => new Chess());
     const [selectedSquare, setSelectedSquare] = useState(null);
     const [status, setStatus] = useState('');
-    const [playerColor] = useState('w');
     const [ai] = useState(() => new ChessAI(difficulty));
     const [lastMove, setLastMove] = useState(null);
+    const [showResignDialog, setShowResignDialog] = useState(false);
+    const [moveHistory, setMoveHistory] = useState([]);
+    const [promotionSquare, setPromotionSquare] = useState(null);
 
     const updateGameStatus = useCallback(() => {
         let status = '';
@@ -17,9 +20,15 @@ const GameBoard = ({ difficulty = 'medium', onBack }) => {
             if (game.isCheckmate()) {
                 status = 'Checkmate! ' + (game.turn() === 'w' ? 'Black' : 'White') + ' wins!';
             } else if (game.isDraw()) {
-                status = 'Draw!';
-            } else {
-                status = 'Game Over!';
+                if (game.isStalemate()) {
+                    status = 'Draw by stalemate!';
+                } else if (game.isThreefoldRepetition()) {
+                    status = 'Draw by threefold repetition!';
+                } else if (game.isInsufficientMaterial()) {
+                    status = 'Draw by insufficient material!';
+                } else {
+                    status = 'Draw!';
+                }
             }
         } else if (game.isCheck()) {
             status = 'Check!';
@@ -35,9 +44,12 @@ const GameBoard = ({ difficulty = 'medium', onBack }) => {
         const move = await ai.getBestMove(game);
         if (move) {
             const result = game.move(move);
-            setLastMove({ from: result.from, to: result.to });
-            setGame(new Chess(game.fen()));
-            updateGameStatus();
+            if (result) {
+                setLastMove({ from: move.from, to: move.to });
+                setMoveHistory(prev => [...prev, result.san]);
+                setGame(new Chess(game.fen()));
+                updateGameStatus();
+            }
         }
     }, [game, playerColor, ai, updateGameStatus]);
 
@@ -45,24 +57,33 @@ const GameBoard = ({ difficulty = 'medium', onBack }) => {
         if (game.isGameOver() || game.turn() !== playerColor) return;
 
         if (selectedSquare) {
-            // Try to make the move
-            const move = {
+            const moveDetails = {
                 from: selectedSquare,
-                to: square,
-                promotion: 'q' // Always promote to queen for simplicity
+                to: square
             };
 
-            try {
-                const result = game.move(move);
-                setLastMove({ from: result.from, to: result.to });
-                setGame(new Chess(game.fen()));
+            // Check for pawn promotion
+            const piece = game.get(selectedSquare);
+            if (piece && 
+                piece.type === 'p' && 
+                ((piece.color === 'w' && square[1] === '8') || 
+                 (piece.color === 'b' && square[1] === '1'))) {
+                setPromotionSquare({ from: selectedSquare, to: square });
                 setSelectedSquare(null);
-                updateGameStatus();
+                return;
+            }
 
-                // Trigger AI move after player's move
-                setTimeout(makeAIMove, 250);
+            try {
+                const result = game.move(moveDetails);
+                if (result) {
+                    setLastMove({ from: result.from, to: result.to });
+                    setMoveHistory(prev => [...prev, result.san]);
+                    setGame(new Chess(game.fen()));
+                    setSelectedSquare(null);
+                    updateGameStatus();
+                    setTimeout(makeAIMove, 250);
+                }
             } catch (error) {
-                // Invalid move, just update selected square
                 const piece = game.get(square);
                 if (piece && piece.color === playerColor) {
                     setSelectedSquare(square);
@@ -71,7 +92,6 @@ const GameBoard = ({ difficulty = 'medium', onBack }) => {
                 }
             }
         } else {
-            // Select the square if it has a piece of the current player's color
             const piece = game.get(square);
             if (piece && piece.color === playerColor) {
                 setSelectedSquare(square);
@@ -79,69 +99,100 @@ const GameBoard = ({ difficulty = 'medium', onBack }) => {
         }
     }, [game, playerColor, selectedSquare, makeAIMove, updateGameStatus]);
 
+    const handlePromotion = useCallback((promotionPiece) => {
+        if (!promotionSquare) return;
+
+        const { from, to } = promotionSquare;
+        const move = game.move({
+            from,
+            to,
+            promotion: promotionPiece
+        });
+
+        if (move) {
+            setLastMove({ from, to });
+            setMoveHistory(prev => [...prev, move.san]);
+            setGame(new Chess(game.fen()));
+            updateGameStatus();
+            setTimeout(makeAIMove, 250);
+        }
+
+        setPromotionSquare(null);
+    }, [game, promotionSquare, makeAIMove, updateGameStatus]);
+
     useEffect(() => {
         updateGameStatus();
-    }, [updateGameStatus]);
-
-    const renderSquare = useCallback((square, i, j) => {
-        const piece = game.get(square);
-        const isSelected = square === selectedSquare;
-        const isLight = (i + j) % 2 === 0;
-        const isLastMove = lastMove && (square === lastMove.from || square === lastMove.to);
-
-        const squareClass = `square ${isLight ? 'light' : 'dark'} ${isSelected ? 'selected' : ''} ${isLastMove ? 'last-move' : ''}`;
-        
-        return (
-            <div 
-                key={square} 
-                className={squareClass}
-                onClick={() => handleSquareClick(square)}
-            >
-                {piece && (
-                    <div className={`piece ${piece.color === 'w' ? 'white' : 'black'} ${isLastMove ? 'moving' : ''}`}>
-                        {getPieceSymbol(piece)}
-                    </div>
-                )}
-            </div>
-        );
-    }, [game, selectedSquare, lastMove, handleSquareClick]);
-
-    const getPieceSymbol = (piece) => {
-        const symbols = {
-            'w': {
-                'p': '♙', 'n': '♘', 'b': '♗',
-                'r': '♖', 'q': '♕', 'k': '♔'
-            },
-            'b': {
-                'p': '♟', 'n': '♞', 'b': '♝',
-                'r': '♜', 'q': '♛', 'k': '♚'
-            }
-        };
-        return symbols[piece.color][piece.type];
-    };
-
-    const renderBoard = () => {
-        const board = [];
-        for (let i = 0; i < 8; i++) {
-            for (let j = 0; j < 8; j++) {
-                const square = String.fromCharCode(97 + j) + (8 - i);
-                board.push(renderSquare(square, i, j));
-            }
+        if (playerColor === 'b') {
+            makeAIMove();
         }
-        return board;
+    }, []);
+
+    const handleResign = () => {
+        // Add resetting class to all pieces
+        const pieces = document.querySelectorAll('.piece');
+        pieces.forEach(piece => {
+          piece.classList.add('resetting');
+        });
+
+        // Reset the game state after animation
+        setTimeout(() => {
+          const initialBoard = new Chess();
+          setGame(initialBoard);
+          setSelectedSquare(null);
+          setMoveHistory([]);
+          setStatus('Game Over - Resigned');
+          setShowResignDialog(false);
+          
+          // Remove animation class
+          pieces.forEach(piece => {
+            piece.classList.remove('resetting');
+          });
+        }, 500);
     };
 
     return (
         <div className="game-container">
-            <div className="game-info">
+            <div className="game-controls">
+                <button className="back-button" onClick={onBack}>← Back</button>
                 <div className="status">{status}</div>
-                {onBack && (
-                    <button className="back-button" onClick={onBack}>
-                        Back to Menu
-                    </button>
-                )}
+                <button className="resign-button" onClick={() => setShowResignDialog(true)}>Resign</button>
             </div>
-            <div className="board">{renderBoard()}</div>
+            
+            <ChessBoard
+                gameState={game}
+                playerColor={playerColor}
+                onSquareClick={handleSquareClick}
+                selectedSquare={selectedSquare}
+                lastMove={lastMove}
+                moveHistory={moveHistory}
+            />
+
+            {showResignDialog && (
+                <div className="overlay">
+                    <div className="resign-dialog">
+                        <h3>Resign Game</h3>
+                        <p>Are you sure you want to resign?</p>
+                        <div className="resign-dialog-buttons">
+                            <button className="cancel-resign" onClick={() => setShowResignDialog(false)}>Cancel</button>
+                            <button className="confirm-resign" onClick={handleResign}>Resign</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {promotionSquare && (
+                <div className="overlay">
+                    <div className="promotion-dialog">
+                        <h3>Choose Promotion Piece</h3>
+                        <div className="promotion-options">
+                            <button className="promotion-piece" onClick={() => handlePromotion('q')}>♕</button>
+                            <button className="promotion-piece" onClick={() => handlePromotion('r')}>♖</button>
+                            <button className="promotion-piece" onClick={() => handlePromotion('b')}>♗</button>
+                            <button className="promotion-piece" onClick={() => handlePromotion('n')}>♘</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

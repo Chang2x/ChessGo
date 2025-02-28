@@ -1,90 +1,102 @@
-import React, { useState } from 'react';
-import { Box, Grid, GridItem, Center } from '@chakra-ui/react';
+import React, { useState, useEffect } from 'react';
+import './ChessBoard.css';
 
-const ChessBoard = ({ gameState, onSquareClick }) => {
-    const [selectedSquare, setSelectedSquare] = useState(null);
+const ChessBoard = ({ 
+    gameState, 
+    playerColor, 
+    onSquareClick, 
+    selectedSquare,
+    lastMove,
+    moveHistory = []
+}) => {
+    const [boardSize, setBoardSize] = useState(Math.min(window.innerWidth, window.innerHeight) * 0.8);
 
-    const handleSquareClick = (row, col) => {
-        const square = `${String.fromCharCode(97 + col)}${8 - row}`;
-        
-        if (selectedSquare) {
-            onSquareClick(selectedSquare, square);
-            setSelectedSquare(null);
-        } else {
-            const piece = gameState.board[row][col];
-            if (piece && piece.color === gameState.turn) {
-                setSelectedSquare(square);
-            }
-        }
+    useEffect(() => {
+        const handleResize = () => {
+            setBoardSize(Math.min(window.innerWidth, window.innerHeight) * 0.8);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const getPieceSymbol = (piece) => {
+        if (!piece) return null;
+        const symbols = {
+            'w': { 'p': '♙', 'n': '♘', 'b': '♗', 'r': '♖', 'q': '♕', 'k': '♔' },
+            'b': { 'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚' }
+        };
+        return symbols[piece.color][piece.type];
     };
 
-    const renderSquare = (row, col) => {
+    const getSquareColor = (row, col, square) => {
         const isLight = (row + col) % 2 === 0;
-        const piece = gameState.board[row][col];
-        const square = `${String.fromCharCode(97 + col)}${8 - row}`;
-        const isSelected = square === selectedSquare;
+        if (selectedSquare === square) {
+            return 'selected';
+        }
+        if (lastMove && (lastMove.from === square || lastMove.to === square)) {
+            return isLight ? 'light-highlighted' : 'dark-highlighted';
+        }
+        return isLight ? 'light' : 'dark';
+    };
+
+    const renderBoard = () => {
+        const board = gameState.board();
+        const rows = playerColor === 'b' ? [...board].reverse() : board;
+        const files = playerColor === 'b' ? 'hgfedcba' : 'abcdefgh';
+        const ranks = playerColor === 'b' ? '12345678' : '87654321';
 
         return (
-            <GridItem
-                key={`${row}-${col}`}
-                bg={isLight ? 'gray.100' : 'gray.400'}
-                border="1px solid"
-                borderColor={isSelected ? 'blue.400' : 'gray.200'}
-                position="relative"
-                w="full"
-                h="full"
-                aspectRatio="1"
-                onClick={() => handleSquareClick(row, col)}
-                cursor="pointer"
-                _hover={{ opacity: 0.8 }}
+            <div 
+                className="board"
+                style={{ 
+                    width: Math.min(boardSize, 480),
+                    height: Math.min(boardSize, 480)
+                }}
             >
-                <Center h="full">
-                    {piece && (
-                        <Box
-                            fontSize={["24px", "32px", "40px"]}
-                            color={piece.color === 'w' ? 'black' : 'black.800'}
-                            userSelect="none"
-                        >
-                            {getPieceSymbol(piece)}
-                        </Box>
-                    )}
-                </Center>
-            </GridItem>
+                {rows.map((row, i) => (
+                    <div key={i} className="row">
+                        {(playerColor === 'b' ? [...row].reverse() : row).map((piece, j) => {
+                            const file = files[j];
+                            const rank = ranks[i];
+                            const square = file + rank;
+                            
+                            return (
+                                <div
+                                    key={square}
+                                    className={`square ${getSquareColor(i, j, square)}`}
+                                    onClick={() => onSquareClick(square)}
+                                >
+                                    {piece && (
+                                        <div className={`piece ${piece.color === 'w' ? 'white' : 'black'}`}>
+                                            {getPieceSymbol(piece)}
+                                        </div>
+                                    )}
+                                    {j === 0 && <div className="rank-label">{rank}</div>}
+                                    {i === 7 && <div className="file-label">{file}</div>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
         );
     };
 
-    const getPieceSymbol = (piece) => {
-        const symbols = {
-            'p': '♟',
-            'r': '♜',
-            'n': '♞',
-            'b': '♝',
-            'q': '♛',
-            'k': '♚',
-        };
-        return piece.color === 'w' 
-            ? symbols[piece.type] 
-            : symbols[piece.type];
-    };
-
     return (
-        <Box w={["300px", "400px", "500px"]} mx="auto">
-            <Grid
-                templateColumns="repeat(8, 1fr)"
-                templateRows="repeat(8, 1fr)"
-                gap={0}
-                border="2px solid"
-                borderColor="gray.300"
-            >
-                {Array(8).fill().map((_, row) => (
-                    <React.Fragment key={row}>
-                        {Array(8).fill().map((_, col) => (
-                            renderSquare(row, col)
-                        ))}
-                    </React.Fragment>
-                ))}
-            </Grid>
-        </Box>
+        <div className="board-container">
+            {renderBoard()}
+            <div className="move-history">
+                <h3>Move History</h3>
+                <div className="moves">
+                    {moveHistory.map((move, index) => (
+                        <span key={index} className="move">
+                            {index % 2 === 0 ? `${Math.floor(index/2 + 1)}. ` : ''}{move}{' '}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        </div>
     );
 };
 

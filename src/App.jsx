@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import SplashScreen from './components/SplashScreen'
 import DifficultySelect from './components/DifficultySelect'
+import ColorSelect from './components/ColorSelect'
 import GameBoard from './components/GameBoard'
 import './App.css'
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('splash');
   const [gameSettings, setGameSettings] = useState({
-    difficulty: null
+    difficulty: null,
+    playerColor: 'w'
   });
 
   const handleSplashFinish = () => {
@@ -19,7 +21,12 @@ function App() {
   };
 
   const handleDifficultySelect = (difficulty) => {
-    setGameSettings({ difficulty });
+    setGameSettings({ ...gameSettings, difficulty });
+    setCurrentScreen('color');
+  };
+
+  const handleColorSelect = (color) => {
+    setGameSettings({ ...gameSettings, playerColor: color });
     setCurrentScreen('game');
   };
 
@@ -28,8 +35,11 @@ function App() {
       case 'difficulty':
         setCurrentScreen('landing');
         break;
-      case 'game':
+      case 'color':
         setCurrentScreen('difficulty');
+        break;
+      case 'game':
+        setCurrentScreen('color');
         break;
       default:
         setCurrentScreen('landing');
@@ -43,8 +53,15 @@ function App() {
     case 'difficulty':
       return <DifficultySelect onSelect={handleDifficultySelect} onBack={handleBack} />;
 
+    case 'color':
+      return <ColorSelect onSelect={handleColorSelect} onBack={handleBack} />;
+
     case 'game':
-      return <GameBoard difficulty={gameSettings.difficulty} onBack={handleBack} />;
+      return <GameBoard 
+        difficulty={gameSettings.difficulty} 
+        playerColor={gameSettings.playerColor}
+        onBack={handleBack} 
+      />;
 
     default:
       return (
