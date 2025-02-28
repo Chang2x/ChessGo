@@ -1,0 +1,78 @@
+.drag-container {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+
+.drag-page {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.page-indicators {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  z-index: 1000;
+}
+
+.page-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.page-dot.active {
+  background: white;
+  transform: scale(1.2);
+}
+
+/* Add swipe hint animation */
+.swipe-hint {
+  position: absolute;
+  bottom: 4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: fadeInOut 2s infinite;
+}
+
+.swipe-hint::before {
+  content: "←";
+  animation: swipeLeft 1.5s infinite;
+}
+
+.swipe-hint::after {
+  content: "→";
+  animation: swipeRight 1.5s infinite;
+}
+
+@keyframes swipeLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-5px); }
+}
+
+@keyframes swipeRight {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+}
