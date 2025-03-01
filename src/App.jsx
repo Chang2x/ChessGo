@@ -1,3 +1,4 @@
+// Force Vercel Update - Chess Game App
 import { useState } from 'react'
 import SplashScreen from './components/SplashScreen'
 import DifficultySelect from './components/DifficultySelect'
